@@ -1,0 +1,51 @@
+name: release_please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: release_please-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.CUE2KEYS_RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Write PR summary
+        if: steps.release.outputs.release_created != 'true'
+        run: |
+          {
+            echo "## release-please"
+            echo
+            if [ "${{ steps.release.outputs.prs_created }}" = 'true' ]; then
+              echo "- Release PR was created or updated."
+            else
+              echo "- No release PR changes were needed."
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Write release summary
+        if: steps.release.outputs.release_created == 'true'
+        run: |
+          {
+            echo "## release-please"
+            echo
+            echo "- Version: \`${{ steps.release.outputs.version }}\`"
+            echo "- Release tag: \`${{ steps.release.outputs.tag_name }}\`"
+            echo "- Release URL: ${{ steps.release.outputs.html_url }}"
+            echo "- Release assets are published by the \`publish_release_assets\` workflow."
+          } >>"$GITHUB_STEP_SUMMARY"

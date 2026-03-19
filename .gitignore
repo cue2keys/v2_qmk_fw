@@ -1,0 +1,53 @@
+# macOS
+.DS_Store
+
+# agent / assistant local files
+.agents/
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# editor / misc
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# local worktree / temporary build workspace
+.work/
+build/
+dist/
+tmp/
+temp/
+.cache/
+
+# python / qmk cli
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# qmk build artifacts
+*.o
+*.obj
+*.d
+*.a
+*.la
+*.lo
+*.elf
+*.hex
+*.bin
+*.uf2
+*.map
+*.lst
+
+# qmk / firmware intermediate outputs
+*.bak
+*.orig
+*.rej
+
+# logs
+*.log

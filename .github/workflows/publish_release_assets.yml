@@ -1,0 +1,127 @@
+name: publish_release_assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing semver release tag to backfill, for example v1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish_release_assets-${{ github.event.release.tag_name || inputs.release_tag || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.CUE2KEYS_RELEASE_PLEASE_TOKEN }}
+    steps:
+      - name: Resolve release context
+        id: context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG_FROM_EVENT: ${{ github.event.release.tag_name }}
+          RELEASE_URL_FROM_EVENT: ${{ github.event.release.html_url }}
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          release_tag=""
+          release_url=""
+
+          case "$EVENT_NAME" in
+            release)
+              release_tag="$RELEASE_TAG_FROM_EVENT"
+              release_url="$RELEASE_URL_FROM_EVENT"
+              ;;
+            workflow_dispatch)
+              release_tag="$RELEASE_TAG_INPUT"
+              release_url="$(gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')"
+              ;;
+            *)
+              echo "unsupported event: $EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          case "$release_tag" in
+            v*)
+              fw_version="${release_tag#v}"
+              ;;
+            *)
+              echo "release tag must use the vX.Y.Z format: $release_tag" >&2
+              exit 1
+              ;;
+          esac
+
+          [ -n "$fw_version" ] || {
+            echo "release tag did not contain a version: $release_tag" >&2
+            exit 1
+          }
+
+          {
+            printf 'checkout_ref=%s\n' "$release_tag"
+            printf 'fw_version=%s\n' "$fw_version"
+            printf 'release_tag=%s\n' "$release_tag"
+            printf 'release_url=%s\n' "$release_url"
+          } >>"$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          path: v2_qmk_fw
+          fetch-depth: 0
+          ref: ${{ steps.context.outputs.checkout_ref }}
+
+      - name: Validate repository shape
+        run: |
+          test -x v2_qmk_fw/tools/build-local.sh
+          test -x v2_qmk_fw/tools/generate-release-manifest.sh
+          test -x v2_qmk_fw/tools/run-qmk-firmware-release.sh
+          test -x v2_qmk_fw/tools/stage-qmk-release-assets.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format flatbuffers-compiler rsync gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+          python3 -m pip install --upgrade qmk ruff
+
+      - name: Build qmk firmware and stage release assets
+        id: stage
+        run: |
+          ./v2_qmk_fw/tools/run-qmk-firmware-release.sh \
+            --repo "$GITHUB_REPOSITORY" \
+            --fw-version "${{ steps.context.outputs.fw_version }}" \
+            --release-tag "${{ steps.context.outputs.release_tag }}" \
+            --release-url "${{ steps.context.outputs.release_url }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Upload release assets
+        run: |
+          gh release upload "${{ steps.context.outputs.release_tag }}" \
+            "v2_qmk_fw/.out/qmk-release/${{ steps.stage.outputs.uf2_name }}" \
+            "v2_qmk_fw/.out/qmk-release/${{ steps.stage.outputs.manifest_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Write workflow summary
+        run: |
+          {
+            echo "## QMK release assets"
+            echo
+            echo "- Version: \`${{ steps.context.outputs.fw_version }}\`"
+            echo "- Release tag: \`${{ steps.context.outputs.release_tag }}\`"
+            echo "- Release URL: ${{ steps.context.outputs.release_url }}"
+            echo "- UF2: \`${{ steps.stage.outputs.uf2_name }}\`"
+            echo "- Manifest: \`${{ steps.stage.outputs.manifest_name }}\`"
+          } >>"$GITHUB_STEP_SUMMARY"

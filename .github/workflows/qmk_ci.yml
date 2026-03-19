@@ -1,0 +1,69 @@
+name: qmk_ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - CHANGELOG.md
+      - .release-please-manifest.json
+      - config.h
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qmk_ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: v2_qmk_fw
+          fetch-depth: 0
+
+      - name: Validate repository shape
+        run: |
+          test -x v2_qmk_fw/tools/build-local.sh
+          test -x v2_qmk_fw/tools/generate-release-manifest.sh
+          test -x v2_qmk_fw/tools/run-qmk-firmware-release.sh
+          test -x v2_qmk_fw/tools/stage-qmk-release-assets.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format flatbuffers-compiler rsync gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+          python3 -m pip install --upgrade qmk ruff
+
+      - name: Build qmk firmware
+        id: build
+        run: |
+          ./v2_qmk_fw/tools/run-qmk-firmware-release.sh \
+            --repo "$GITHUB_REPOSITORY" \
+            --release-tag "ci-${GITHUB_SHA}" \
+            --release-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qmk-ci-build
+          path: v2_qmk_fw/.out/qmk-build
+
+      - name: Write workflow summary
+        run: |
+          {
+            echo "## QMK CI"
+            echo
+            echo "- FW_VERSION: \`${{ steps.build.outputs.fw_version }}\`"
+            echo "- UF2: \`${{ steps.build.outputs.uf2_name }}\`"
+            echo "- Manifest: \`${{ steps.build.outputs.manifest_name }}\`"
+          } >>"$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+resolve_path() {
+  local path="$1"
+
+  case "$path" in
+    "~")
+      path="$HOME"
+      ;;
+    "~/"*)
+      path="$HOME/${path#~/}"
+      ;;
+  esac
+
+  if [ -d "$path" ]; then
+    (cd "$path" && pwd)
+    return 0
+  fi
+
+  if [ -e "$path" ]; then
+    (cd "$(dirname "$path")" && printf '%s/%s\n' "$(pwd)" "$(basename "$path")")
+    return 0
+  fi
+
+  printf '%s\n' "$path"
+}
+
+global_hooks_path="$(git config --path --get --global core.hooksPath || true)"
+current_hooks_dir="$(cd "$(dirname "$0")" && pwd)"
+
+if [ -n "$global_hooks_path" ]; then
+  resolved_global_hooks_path="$(resolve_path "$global_hooks_path")"
+  if [ "$resolved_global_hooks_path" != "$current_hooks_dir" ]; then
+    global_pre_commit="$resolved_global_hooks_path/pre-commit"
+    if [ -x "$global_pre_commit" ]; then
+      "$global_pre_commit" "$@"
+    fi
+  fi
+fi
+
+exec "$ROOT/tools/format.sh"
