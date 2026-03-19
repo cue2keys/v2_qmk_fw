@@ -1,6 +1,6 @@
 #pragma once
 
-#define FW_VERSION "2.0.0" // x-release-please-version
+#define FW_VERSION "2.1.0" // x-release-please-version
 #define EECONFIG_KB_DATA_VERSION (0x01)
 
 // see `wear_leveling_rp2040_flash_config.h`
