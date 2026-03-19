@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.1.0](https://github.com/cue2keys/v2_qmk_fw/compare/v2.0.0...v2.1.0) (2026-03-19)
+## [2.0.0](https://github.com/cue2keys/v2_qmk_fw/compare/v2.0.0...v2.0.0) (2026-03-19)
 
 
 ### Features
