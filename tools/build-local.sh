@@ -10,6 +10,7 @@ CI_MODE="false"
 CLEAN_BUILD="false"
 KEYBOARD=""
 KEYMAP=""
+QMK_PROFILE="debug"
 ARTIFACT_DIR=""
 FLATCC_SRC_DIR="${FLATCC_SRC_DIR:-$WORK/vendor/flatcc}"
 
@@ -28,6 +29,52 @@ die() {
 
 ensure_tool() {
   command -v "$1" >/dev/null 2>&1 || die "required tool not found: $1"
+}
+
+detect_qmk_parallel() {
+  if [ -n "${QMK_PARALLEL:-}" ]; then
+    printf '%s\n' "$QMK_PARALLEL"
+    return 0
+  fi
+
+  local jobs=""
+
+  if command -v getconf >/dev/null 2>&1; then
+    jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+  fi
+
+  if [ -z "$jobs" ] && command -v sysctl >/dev/null 2>&1; then
+    jobs="$(sysctl -n hw.logicalcpu 2>/dev/null || true)"
+  fi
+
+  if [ -z "$jobs" ] && command -v nproc >/dev/null 2>&1; then
+    jobs="$(nproc 2>/dev/null || true)"
+  fi
+
+  if [ -n "$jobs" ] && [ "$jobs" -ge 1 ] 2>/dev/null; then
+    printf '%s\n' "$jobs"
+  else
+    printf '1\n'
+  fi
+}
+
+select_qmk_make() {
+  if [ -n "${MAKE:-}" ] && command -v "$MAKE" >/dev/null 2>&1; then
+    printf '%s\n' "$MAKE"
+    return 0
+  fi
+
+  if command -v gmake >/dev/null 2>&1; then
+    printf 'gmake\n'
+    return 0
+  fi
+
+  printf 'make\n'
+}
+
+make_supports_output_sync() {
+  local make_cmd="$1"
+  "$make_cmd" --help 2>/dev/null | grep -q -- '--output-sync'
 }
 
 is_qmk_checkout() {
@@ -70,6 +117,7 @@ Options:
   --clean
   --keyboard <name>
   --keymap <name>
+  --qmk-profile <debug|release>
   --qmk-upstream <url>
   --qmk-ref <ref>
   --qmk-action <compile|flash>
@@ -94,6 +142,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --keymap)
       KEYMAP="$2"
+      shift 2
+      ;;
+    --qmk-profile)
+      QMK_PROFILE="$2"
       shift 2
       ;;
     --qmk-upstream)
@@ -134,6 +186,13 @@ case "$QMK_ACTION" in
   compile | flash) ;;
   *)
     die "unsupported qmk action: $QMK_ACTION"
+    ;;
+esac
+
+case "$QMK_PROFILE" in
+  debug | release) ;;
+  *)
+    die "unsupported qmk profile: $QMK_PROFILE"
     ;;
 esac
 
@@ -193,14 +252,43 @@ if [ ! -f "$FLATCC_STAGE_DIR/include/flatcc/flatcc_flatbuffers.h" ]; then
   die "missing flatcc runtime header: $FLATCC_STAGE_DIR/include/flatcc/flatcc_flatbuffers.h; rerun the workspace-level QMK build entrypoint or pass --flatcc-src-dir with a valid flatcc checkout"
 fi
 
+profile_env_args=()
+if [ "$QMK_PROFILE" = "release" ]; then
+  profile_env_args=(
+    -e "CONSOLE_ENABLE=no"
+    -e "COMMAND_ENABLE=no"
+    -e "LTO_ENABLE=yes"
+    -e "OPT=2"
+    -e "EXTRAFLAGS=-flto=auto"
+  )
+fi
+
+qmk_parallel="$(detect_qmk_parallel)"
+qmk_make="$(select_qmk_make)"
+use_qmk_parallel="false"
+if [ "$qmk_parallel" -gt 1 ] 2>/dev/null && make_supports_output_sync "$qmk_make"; then
+  use_qmk_parallel="true"
+fi
+
 cd "$QMK_DIR"
 if [ "$QMK_ACTION" = "flash" ]; then
-  log "running qmk flash -kb $KEYBOARD -km $KEYMAP"
-  qmk flash -kb "$KEYBOARD" -km "$KEYMAP"
+  log "running qmk flash -kb $KEYBOARD -km $KEYMAP (profile: $QMK_PROFILE)"
+  qmk_cmd=(qmk flash)
 else
-  log "running qmk compile -kb $KEYBOARD -km $KEYMAP"
-  qmk compile -kb "$KEYBOARD" -km "$KEYMAP"
+  log "running qmk compile -kb $KEYBOARD -km $KEYMAP (profile: $QMK_PROFILE)"
+  qmk_cmd=(qmk compile)
 fi
+
+if [ "$QMK_PROFILE" = "release" ] || [ "${#profile_env_args[@]}" -gt 0 ]; then
+  qmk_cmd+=("${profile_env_args[@]}")
+fi
+
+if [ "$use_qmk_parallel" = "true" ]; then
+  qmk_cmd+=(-j "$qmk_parallel")
+fi
+
+qmk_cmd+=(-kb "$KEYBOARD" -km "$KEYMAP")
+MAKE="$qmk_make" "${qmk_cmd[@]}"
 
 if [ -n "$ARTIFACT_DIR" ]; then
   mkdir -p "$ARTIFACT_DIR"

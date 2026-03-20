@@ -135,13 +135,21 @@ for candidate in sorted(path for path in artifact_dir.iterdir() if path.is_file(
     )
 
 uf2_artifacts = [artifact for artifact in artifacts if artifact["name"].endswith(".uf2")]
-if len(uf2_artifacts) != 1:
-    raise SystemExit(f"release manifest requires exactly one uf2 artifact, found {len(uf2_artifacts)}")
+if len(uf2_artifacts) != 2:
+    raise SystemExit(f"release manifest requires exactly two uf2 artifacts, found {len(uf2_artifacts)}")
 
-uf2_artifact = uf2_artifacts[0]
+debug_uf2_artifacts = [artifact for artifact in uf2_artifacts if artifact["name"].endswith("_debug.uf2")]
+release_uf2_artifacts = [artifact for artifact in uf2_artifacts if not artifact["name"].endswith("_debug.uf2")]
+if len(debug_uf2_artifacts) != 1:
+    raise SystemExit(f"release manifest requires exactly one debug uf2 artifact, found {len(debug_uf2_artifacts)}")
+if len(release_uf2_artifacts) != 1:
+    raise SystemExit(f"release manifest requires exactly one release uf2 artifact, found {len(release_uf2_artifacts)}")
+
+debug_uf2_artifact = debug_uf2_artifacts[0]
+release_uf2_artifact = release_uf2_artifacts[0]
 
 manifest = {
-    "manifest_version": 1,
+    "manifest_version": 2,
     "release": {
         "mode": "release",
         "version": release_tag,
@@ -161,10 +169,21 @@ manifest = {
         "release_tag": release_tag,
         "release_url": release_url,
         "repository": repo_slug,
-        "uf2": {
-            "name": uf2_artifact["name"],
-            "path": uf2_artifact["path"],
-            "sha256": uf2_artifact["sha256"],
+        "builds": {
+            "release": {
+                "uf2": {
+                    "name": release_uf2_artifact["name"],
+                    "path": release_uf2_artifact["path"],
+                    "sha256": release_uf2_artifact["sha256"],
+                }
+            },
+            "debug": {
+                "uf2": {
+                    "name": debug_uf2_artifact["name"],
+                    "path": debug_uf2_artifact["path"],
+                    "sha256": debug_uf2_artifact["sha256"],
+                }
+            },
         },
     },
 }
