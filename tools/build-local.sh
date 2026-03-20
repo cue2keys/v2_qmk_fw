@@ -254,13 +254,25 @@ fi
 
 profile_env_args=()
 if [ "$QMK_PROFILE" = "release" ]; then
+  release_console_enable="${QMK_RELEASE_CONSOLE_ENABLE-no}"
+  release_command_enable="${QMK_RELEASE_COMMAND_ENABLE-no}"
+  release_lto_enable="${QMK_RELEASE_LTO_ENABLE-yes}"
+  release_opt="${QMK_RELEASE_OPT-2}"
+  release_extraflags="${QMK_RELEASE_EXTRAFLAGS--flto=auto}"
+
   profile_env_args=(
-    -e "CONSOLE_ENABLE=no"
-    -e "COMMAND_ENABLE=no"
-    -e "LTO_ENABLE=yes"
-    -e "OPT=2"
-    -e "EXTRAFLAGS=-flto=auto"
+    -e "CONSOLE_ENABLE=${release_console_enable}"
+    -e "COMMAND_ENABLE=${release_command_enable}"
   )
+  if [ -n "$release_lto_enable" ]; then
+    profile_env_args+=(-e "LTO_ENABLE=${release_lto_enable}")
+  fi
+  if [ -n "$release_opt" ]; then
+    profile_env_args+=(-e "OPT=${release_opt}")
+  fi
+  if [ -n "$release_extraflags" ]; then
+    profile_env_args+=(-e "EXTRAFLAGS=${release_extraflags}")
+  fi
 fi
 
 qmk_parallel="$(detect_qmk_parallel)"
