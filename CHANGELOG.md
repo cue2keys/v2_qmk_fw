@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/cue2keys/v2_qmk_fw/compare/v2.0.1...v2.0.2) (2026-03-20)
+
+
+### Bug Fixes
+
+* release build in github actions ([40ff5b3](https://github.com/cue2keys/v2_qmk_fw/commit/40ff5b33e9cb3d1830719d9e15bfb6a37080b51b))
+
 ## [2.0.1](https://github.com/cue2keys/v2_qmk_fw/compare/v2.0.0...v2.0.1) (2026-03-20)
 
 
