@@ -11,6 +11,7 @@
 https://github.com/cue2keys/v2_meta_build
 
 更新した内容はGithub Actionsを使い、最終的にreleaseに追加されます。
+CIとreleaseのビルドでは `Arm GNU Toolchain 15.2.Rel1 `を固定で使用します。Ubuntu標準の `gcc-arm-none-eabi` パッケージでは、releaseビルドが成功しても実機で起動しない問題が発生したためです。
 
 ## 初回セットアップ
 

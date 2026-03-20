@@ -93,8 +93,30 @@ jobs:
       - name: Install host tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format flatbuffers-compiler rsync gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+          sudo apt-get install -y cmake nodejs clang-format flatbuffers-compiler rsync gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf picolibc-riscv64-unknown-elf
           python3 -m pip install --upgrade qmk ruff
+
+      - name: Install Arm GNU Toolchain 15.2.Rel1
+        run: |
+          set -euo pipefail
+          ./v2_qmk_fw/tools/install-arm-toolchain.sh \
+            --install-dir "$RUNNER_TEMP/arm-gnu-toolchain-15.2.rel1"
+
+      - name: Verify Arm GNU Toolchain
+        id: toolchain
+        run: |
+          set -euo pipefail
+          toolchain_path="$(which arm-none-eabi-gcc)"
+          version_line="$(arm-none-eabi-gcc --version | head -n 1)"
+          printf 'toolchain_path=%s\n' "$toolchain_path" >>"$GITHUB_OUTPUT"
+          printf 'toolchain_version=%s\n' "$version_line" >>"$GITHUB_OUTPUT"
+
+          printf 'arm-none-eabi-gcc path: %s\n' "$toolchain_path"
+          printf 'arm-none-eabi-gcc version: %s\n' "$version_line"
+          printf 'ARM_GNU_TOOLCHAIN_DIR=%s\n' "${ARM_GNU_TOOLCHAIN_DIR:-unset}"
+          printf 'ARM_GNU_TOOLCHAIN_URL=%s\n' "${ARM_GNU_TOOLCHAIN_URL:-unset}"
+
+          printf '%s\n' "$version_line" | grep -Fq 'Arm GNU Toolchain 15.2.Rel1'
 
       - name: Build qmk firmware and stage release assets
         id: stage
@@ -126,4 +148,8 @@ jobs:
             echo "- Release UF2: \`${{ steps.stage.outputs.release_uf2_name }}\`"
             echo "- Debug UF2: \`${{ steps.stage.outputs.debug_uf2_name }}\`"
             echo "- Manifest: \`${{ steps.stage.outputs.manifest_name }}\`"
+            echo "- Arm toolchain: \`${{ steps.toolchain.outputs.toolchain_version }}\`"
+            echo "- Arm gcc path: \`${{ steps.toolchain.outputs.toolchain_path }}\`"
+            echo "- Arm install dir: \`${ARM_GNU_TOOLCHAIN_DIR:-unset}\`"
+            echo "- Arm download URL: \`${ARM_GNU_TOOLCHAIN_URL:-unset}\`"
           } >>"$GITHUB_STEP_SUMMARY"

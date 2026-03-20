@@ -11,6 +11,11 @@ die() {
   exit 1
 }
 
+ensure_tool() {
+  local tool="$1"
+  command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool"
+}
+
 ensure_dir() {
   mkdir -p "$1"
 }
