@@ -34,6 +34,10 @@ git config core.hooksPath .githooks
 ./tools/build-local.sh --keyboard cue2keys --keymap default
 ```
 
+```sh
+./tools/build-local.sh --keyboard cue2keys --keymap default --qmk-profile release
+```
+
 clean build
 
 ```sh

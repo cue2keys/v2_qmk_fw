@@ -55,8 +55,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: qmk-ci-build
-          path: v2_qmk_fw/.out/qmk-build
+          name: qmk-ci-release-assets
+          path: v2_qmk_fw/.out/qmk-release
 
       - name: Write workflow summary
         run: |
@@ -64,6 +64,7 @@ jobs:
             echo "## QMK CI"
             echo
             echo "- FW_VERSION: \`${{ steps.build.outputs.fw_version }}\`"
-            echo "- UF2: \`${{ steps.build.outputs.uf2_name }}\`"
+            echo "- Release UF2: \`${{ steps.build.outputs.release_uf2_name }}\`"
+            echo "- Debug UF2: \`${{ steps.build.outputs.debug_uf2_name }}\`"
             echo "- Manifest: \`${{ steps.build.outputs.manifest_name }}\`"
           } >>"$GITHUB_STEP_SUMMARY"

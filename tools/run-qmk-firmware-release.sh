@@ -148,7 +148,7 @@ if [ "$DRY_RUN" = "true" ]; then
   log "release dir: $RELEASE_DIR"
   log "fw version: $fw_version"
   log "release tag: $release_tag"
-  log "would build qmk firmware and stage release assets"
+  log "would build qmk firmware for release and debug profiles and stage release assets"
   exit 0
 fi
 
@@ -159,19 +159,33 @@ log "building flatcc in $FLATCC_DIR"
   ./scripts/build.sh
 )
 
-log "building qmk firmware"
+release_artifacts_dir="$ARTIFACTS_DIR/release"
+debug_artifacts_dir="$ARTIFACTS_DIR/debug"
+
+log "building qmk firmware (release profile)"
 "$ROOT/tools/build-local.sh" \
   --ci \
   --keyboard "$KEYBOARD" \
   --keymap "$KEYMAP" \
-  --artifact-dir "$ARTIFACTS_DIR" \
+  --qmk-profile release \
+  --artifact-dir "$release_artifacts_dir" \
+  --flatcc-src-dir "$FLATCC_DIR"
+
+log "building qmk firmware (debug profile)"
+"$ROOT/tools/build-local.sh" \
+  --ci \
+  --keyboard "$KEYBOARD" \
+  --keymap "$KEYMAP" \
+  --qmk-profile debug \
+  --artifact-dir "$debug_artifacts_dir" \
   --flatcc-src-dir "$FLATCC_DIR"
 
 "$ROOT/tools/stage-qmk-release-assets.sh" \
   --keyboard "$KEYBOARD" \
   --keymap "$KEYMAP" \
   --repo "$REPO_SLUG" \
-  --artifact-dir "$ARTIFACTS_DIR" \
+  --release-artifact-dir "$release_artifacts_dir" \
+  --debug-artifact-dir "$debug_artifacts_dir" \
   --release-dir "$RELEASE_DIR" \
   --release-tag "$release_tag" \
   --release-url "$release_url" \

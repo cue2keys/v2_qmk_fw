@@ -109,7 +109,8 @@ jobs:
       - name: Upload release assets
         run: |
           gh release upload "${{ steps.context.outputs.release_tag }}" \
-            "v2_qmk_fw/.out/qmk-release/${{ steps.stage.outputs.uf2_name }}" \
+            "v2_qmk_fw/.out/qmk-release/${{ steps.stage.outputs.release_uf2_name }}" \
+            "v2_qmk_fw/.out/qmk-release/${{ steps.stage.outputs.debug_uf2_name }}" \
             "v2_qmk_fw/.out/qmk-release/${{ steps.stage.outputs.manifest_name }}" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
@@ -122,6 +123,7 @@ jobs:
             echo "- Version: \`${{ steps.context.outputs.fw_version }}\`"
             echo "- Release tag: \`${{ steps.context.outputs.release_tag }}\`"
             echo "- Release URL: ${{ steps.context.outputs.release_url }}"
-            echo "- UF2: \`${{ steps.stage.outputs.uf2_name }}\`"
+            echo "- Release UF2: \`${{ steps.stage.outputs.release_uf2_name }}\`"
+            echo "- Debug UF2: \`${{ steps.stage.outputs.debug_uf2_name }}\`"
             echo "- Manifest: \`${{ steps.stage.outputs.manifest_name }}\`"
           } >>"$GITHUB_STEP_SUMMARY"
