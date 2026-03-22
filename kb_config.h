@@ -49,9 +49,9 @@ typedef struct __attribute__((packed)) {
     // 2^4=16, default: 6, max: 15
     uint8_t tapping_term_50ms : 4;
 
-    // Display mode (0: Info, 1: U1 walking, 2: keypress)
-    // 2^2=4, default: 0, max: 2
-    uint8_t display_mode : 2;
+    // Display mode (0: Info, 1: U1 walking, 2: selected key, 3: input device)
+    // 2^3=8, default: 0, max: 3
+    uint8_t display_mode : 3;
 
     // Pendant LED base mode (0: Off, 1: Layer, 2: RandomOnType, 3: Scanning)
     // 2^2=4, default: 3, max: 3
@@ -62,7 +62,7 @@ typedef struct __attribute__((packed)) {
     uint8_t magkey_data_bytes : 2;
 
     // Dummy value for padding
-    uint8_t _dummy : 2;
+    uint8_t _dummy : 1;
 } GeneralConfigBits;
 _Static_assert(sizeof(GeneralConfigBits) == 3, "GeneralConfigBits must fit into 3 bytes");
 

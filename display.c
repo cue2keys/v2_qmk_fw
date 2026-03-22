@@ -9,6 +9,7 @@
 #include "trackball.h"
 #include "oled_driver.h"
 #include "display.h"
+#include <stdio.h>
 #include <string.h>
 
 #ifdef OLED_ENABLE
@@ -16,9 +17,25 @@
 extern DeviceList deviceList[MAX_MCP_NUM];
 extern uint16_t   nDevices;
 
-DisplayMode    display_mode                = DisplayMode_Info;
-static uint8_t display_keypress_target_row = 0;
-static uint8_t display_keypress_target_col = 0;
+typedef enum {
+    DisplayInputDeviceType_NormalKey = 0,
+    DisplayInputDeviceType_MagKey,
+    DisplayInputDeviceType_RotaryEncoder,
+} DisplayInputDeviceType;
+
+typedef struct {
+    uint8_t                row;
+    uint8_t                col;
+    uint8_t                i2c_addr;
+    bool                   has_i2c_addr;
+    bool                   has_value;
+    DisplayInputDeviceType type;
+} DisplayLastInputState;
+
+DisplayMode                display_mode                = DisplayMode_Info;
+static uint8_t             display_keypress_target_row = 0;
+static uint8_t             display_keypress_target_col = 0;
+static DisplayLastInputState display_last_input          = {0};
 
 uint8_t display_get_mode(void) {
     return (uint8_t)display_mode;
@@ -37,10 +54,10 @@ void display_set_mode(DisplayMode mode) {
 }
 
 void display_set_keypress_target(uint8_t row, uint8_t col) {
-    dprintf("Display Keypress at row=%u col=%u\n", row, col);
+    dprintf("Display selected key at row=%u col=%u\n", row, col);
     display_keypress_target_row = row;
     display_keypress_target_col = col;
-    display_set_mode((uint8_t)DisplayMode_Keypress);
+    display_set_mode(DisplayMode_SelectedKey);
 }
 
 bool process_record_kb_display(uint16_t keycode, keyrecord_t *record) {
@@ -54,6 +71,121 @@ bool process_record_kb_display(uint16_t keycode, keyrecord_t *record) {
     }
 
     return true;
+}
+
+static uint8_t display_device_key_width(Pendant_v2_ModuleType_enum_t type) {
+    switch (type) {
+        case Pendant_v2_ModuleType_V1_PCA9557_Keys4:
+        case Pendant_v2_ModuleType_V1_XL9555_Keys4:
+        case Pendant_v2_ModuleType_V2_Keys4:
+        case Pendant_v2_ModuleType_V2_MagKeys4:
+            return 4;
+        case Pendant_v2_ModuleType_V1_PCA9557_Keys5:
+        case Pendant_v2_ModuleType_V1_XL9555_Keys5:
+            return 5;
+        case Pendant_v2_ModuleType_V1_PCA9534A_RE:
+        case Pendant_v2_ModuleType_V2_RE:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static DisplayInputDeviceType display_device_type_from_module(Pendant_v2_ModuleType_enum_t type) {
+    switch (type) {
+        case Pendant_v2_ModuleType_V2_MagKeys4:
+            return DisplayInputDeviceType_MagKey;
+        case Pendant_v2_ModuleType_V1_PCA9534A_RE:
+        case Pendant_v2_ModuleType_V2_RE:
+            return DisplayInputDeviceType_RotaryEncoder;
+        default:
+            return DisplayInputDeviceType_NormalKey;
+    }
+}
+
+static const char *display_input_type_name(DisplayInputDeviceType type) {
+    switch (type) {
+        case DisplayInputDeviceType_MagKey:
+            return "MagKey";
+        case DisplayInputDeviceType_RotaryEncoder:
+            return "RotaryEnc";
+        case DisplayInputDeviceType_NormalKey:
+        default:
+            return "NormalKey";
+    }
+}
+
+static const DeviceList *display_find_device_for_key(uint8_t row, uint8_t col, DisplayInputDeviceType *out_type) {
+    if (row >= MATRIX_ROWS || col >= MATRIX_COLS) {
+        return NULL;
+    }
+
+    uint16_t key_index = (uint16_t)row * MATRIX_COLS + col;
+    for (uint16_t i = 0; i < nDevices; i++) {
+        const DeviceList *device = &deviceList[i];
+        uint8_t           width  = display_device_key_width(device->type);
+        if (width == 0) {
+            continue;
+        }
+
+        if (key_index < device->keymapShift || key_index >= (uint16_t)(device->keymapShift + width)) {
+            continue;
+        }
+
+        if (out_type) {
+            *out_type = display_device_type_from_module(device->type);
+        }
+        return device;
+    }
+
+    return NULL;
+}
+
+static const DeviceList *display_find_encoder_device(uint8_t index) {
+    uint8_t target = index;
+    for (uint16_t i = 0; i < nDevices; i++) {
+        const DeviceList *device = &deviceList[i];
+        if (device->type != Pendant_v2_ModuleType_V1_PCA9534A_RE && device->type != Pendant_v2_ModuleType_V2_RE) {
+            continue;
+        }
+        if (target != 0) {
+            target--;
+            continue;
+        }
+        return device;
+    }
+    return NULL;
+}
+
+void display_record_key_input(uint8_t row, uint8_t col) {
+    const DeviceList *device = NULL;
+
+    display_last_input.row   = row;
+    display_last_input.col   = col;
+    display_last_input.type  = DisplayInputDeviceType_NormalKey;
+    display_last_input.has_i2c_addr = false;
+    display_last_input.i2c_addr     = 0;
+    display_last_input.has_value    = true;
+
+    device = display_find_device_for_key(row, col, &display_last_input.type);
+    if (device) {
+        display_last_input.has_i2c_addr = true;
+        display_last_input.i2c_addr     = device->address;
+    }
+}
+
+void display_record_encoder_input(uint8_t index) {
+    const DeviceList *device = display_find_encoder_device(index);
+    if (!device) {
+        return;
+    }
+
+    display_last_input.row          = (uint8_t)(device->keymapShift / MATRIX_COLS);
+    display_last_input.col          = (uint8_t)(device->keymapShift % MATRIX_COLS);
+    display_last_input.type         = DisplayInputDeviceType_RotaryEncoder;
+    display_last_input.has_i2c_addr = true;
+    display_last_input.i2c_addr     = device->address;
+    display_last_input.has_value    = true;
 }
 
 static void write_padded_line(uint8_t row, const char *text) {
@@ -178,7 +310,7 @@ bool oled_task_kb(void) {
 
             break;
         }
-        case DisplayMode_Keypress: {
+        case DisplayMode_SelectedKey: {
             uint16_t           value       = 0;
             bool               has_value   = false;
             const kb_config_t *kb          = kb_config_get();
@@ -309,6 +441,32 @@ bool oled_task_kb(void) {
                 oled_set_cursor(0, 7);
                 oled_write(line, false);
             }
+            break;
+        }
+        case DisplayMode_InputDevice: {
+            char line[22];
+
+            write_padded_line(0, "Input Device");
+            if (!display_last_input.has_value) {
+                write_padded_line(2, "No input yet");
+                write_padded_line(4, "ROW: -  COL: -");
+                write_padded_line(6, "I2C: N/A");
+                write_padded_line(7, "TYPE: -");
+                break;
+            }
+
+            snprintf(line, sizeof(line), "ROW:%u COL:%u", display_last_input.row, display_last_input.col);
+            write_padded_line(2, line);
+
+            if (display_last_input.has_i2c_addr) {
+                snprintf(line, sizeof(line), "I2C: 0x%02X", display_last_input.i2c_addr);
+            } else {
+                snprintf(line, sizeof(line), "I2C: N/A");
+            }
+            write_padded_line(4, line);
+
+            snprintf(line, sizeof(line), "TYPE: %s", display_input_type_name(display_last_input.type));
+            write_padded_line(6, line);
             break;
         }
         case DisplayMode_MAX:
