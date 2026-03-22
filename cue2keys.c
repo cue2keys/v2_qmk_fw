@@ -248,8 +248,8 @@ void keyboard_post_init_kb(void) {
     {
         const kb_config_t *kb           = kb_config_get();
         uint8_t            display_mode = kb->v.general.display_mode;
-        // if the stored display mode is invalid or set to Keypress, reset to default
-        if (display_mode >= DisplayMode_MAX || display_mode == DisplayMode_Keypress) {
+        // if the stored display mode is invalid or set to SelectedKey, reset to default
+        if (display_mode >= DisplayMode_MAX || display_mode == DisplayMode_SelectedKey) {
             GeneralConfigBits general = *kb_config_get_general();
             display_mode              = DisplayMode_Info;
             general.display_mode      = display_mode;
@@ -354,6 +354,9 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 #ifdef OLED_ENABLE
     if (!process_record_kb_display(keycode, record)) {
         return false;
+    }
+    if (record->event.pressed) {
+        display_record_key_input(record->event.key.row, record->event.key.col);
     }
 #endif
 

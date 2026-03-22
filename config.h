@@ -1,7 +1,7 @@
 #pragma once
 
 #define FW_VERSION "2.0.2" // x-release-please-version
-#define EECONFIG_KB_DATA_VERSION (0x01)
+#define EECONFIG_KB_DATA_VERSION (0x02)
 
 // see `wear_leveling_rp2040_flash_config.h`
 // currently, using 16MB SPI flash

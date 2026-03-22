@@ -2,6 +2,7 @@
 #include "i2clib.h"
 #include "device_scanner.h"
 #include "kb_config.h"
+#include "display.h"
 #include "./drivers/encoder_dynamic_res.h"
 
 extern DeviceList deviceList[MAX_MCP_NUM];
@@ -29,21 +30,6 @@ uint8_t encoder_quadrature_read_pin(uint8_t index, bool pad_b) {
 
             const uint8_t data = encoder_data[index];
 
-            // bool success = change_channel(deviceList[i].ch);
-            // if (!success) {
-            //     continue;
-            // }
-
-            // Keys_Data data;
-            // if (deviceList[i].type == Pendant_v2_ModuleType_V1_PCA9534A_RE)
-            //     data = read_PCA9534A_register(deviceList[i].address);
-            // else if (deviceList[i].type == Pendant_v2_ModuleType_V2_RE)
-            //     data = read_v2_re_register(deviceList[i].address);
-            // else {
-            //     dprintf("[encoder_quadrature_read_pin] invalid type: %d\n", deviceList[i].type);
-            //     continue;
-            // }
-
             // data -> XXXXX (click) (B) (A)
             if (pad_b) {
                 return (data & (0x01 << 1)) >> 1;
@@ -58,9 +44,9 @@ uint8_t encoder_quadrature_read_pin(uint8_t index, bool pad_b) {
 }
 
 bool encoder_update_kb(uint8_t index, bool clockwise) {
-    // #    ifdef POINTING_DEVICE_ENABLE
-    //     modular_pmw3610_wake_up(1, true);
-    // #    endif
+#ifdef OLED_ENABLE
+    display_record_encoder_input(index);
+#endif
     return encoder_update_user(index, clockwise);
 }
 
