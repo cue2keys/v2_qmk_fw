@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/cue2keys/v2_qmk_fw/compare/v2.0.2...v2.1.0) (2026-03-22)
+
+
+### Features
+
+* add display mode (input device) ([#6](https://github.com/cue2keys/v2_qmk_fw/issues/6)) ([88a8371](https://github.com/cue2keys/v2_qmk_fw/commit/88a8371392b65f1bba007c238c56bd9a6cbc494e))
+
 ## [2.0.2](https://github.com/cue2keys/v2_qmk_fw/compare/v2.0.1...v2.0.2) (2026-03-20)
 
 
