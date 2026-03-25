@@ -91,6 +91,7 @@ const pointing_device_driver_t modular_adns5050_pointing_device_driver;
 // manually manipulate a serial clock signal.
 bool           modular_adns5050_init(void);
 void           modular_adns5050_init_slot(uint8_t index);
+void           modular_adns5050_set_reset_mode_for_pair(uint8_t pair_index);
 bool           modular_adns5050_probe(uint8_t index);
 report_mouse_t modular_adns5050_get_all_report(report_mouse_t mouse_report);
 uint16_t       modular_adns5050_get_all_cpi(void);

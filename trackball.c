@@ -13,6 +13,8 @@ static bool                    set_scrolling        = false;
 static float                   scroll_accumulated_h = 0.0f;
 static float                   scroll_accumulated_v = 0.0f;
 
+#define TRACKBALL_SHARED_PAIR_COUNT (TRACKBALL_SLOT_COUNT / 2)
+
 uint16_t calc_auto_mouse_timeout_by_kbconfig(uint8_t value) {
     return 100 * value;
 }
@@ -26,6 +28,14 @@ uint16_t calc_cpi_by_kbconfig(uint8_t cpi_step) {
 
 static bool trackball_slot_valid(uint8_t index) {
     return index < TRACKBALL_SLOT_COUNT;
+}
+
+static bool trackball_pair_valid(uint8_t pair_index) {
+    return pair_index < TRACKBALL_SHARED_PAIR_COUNT;
+}
+
+static uint8_t trackball_pair_start_slot(uint8_t pair_index) {
+    return (uint8_t)(pair_index * 2u);
 }
 
 static uint16_t calc_adns5050_cpi(uint16_t requested_cpi) {
@@ -42,22 +52,49 @@ static uint16_t calc_adns5050_cpi(uint16_t requested_cpi) {
     return effective_cpi;
 }
 
-static void trackball_probe_slot(uint8_t index) {
+static void trackball_reset_slot_state(uint8_t index) {
     trackball_sensor_type[index]   = TRACKBALL_SENSOR_NONE;
     trackball_connected[index]     = false;
     trackball_effective_cpi[index] = 0;
+}
 
-    modular_pmw3610_init_slot(index);
-    if (modular_pmw3610_probe(index)) {
-        trackball_sensor_type[index] = TRACKBALL_SENSOR_PMW3610;
-        trackball_connected[index]   = true;
+static void trackball_probe_pair(uint8_t pair_index) {
+    if (!trackball_pair_valid(pair_index)) {
         return;
     }
 
-    modular_adns5050_init_slot(index);
-    if (modular_adns5050_probe(index)) {
-        trackball_sensor_type[index] = TRACKBALL_SENSOR_ADNS5050;
-        trackball_connected[index]   = true;
+    uint8_t first  = trackball_pair_start_slot(pair_index);
+    uint8_t second = (uint8_t)(first + 1u);
+    bool    pmw_found  = false;
+
+    trackball_reset_slot_state(first);
+    trackball_reset_slot_state(second);
+
+    modular_pmw3610_set_motion_mode_for_pair(pair_index);
+    modular_pmw3610_init_slot(first);
+    modular_pmw3610_init_slot(second);
+
+    for (uint8_t slot = first; slot <= second; slot++) {
+        if (modular_pmw3610_probe(slot)) {
+            trackball_sensor_type[slot] = TRACKBALL_SENSOR_PMW3610;
+            trackball_connected[slot]   = true;
+            pmw_found                   = true;
+        }
+    }
+
+    if (pmw_found) {
+        return;
+    }
+
+    modular_adns5050_set_reset_mode_for_pair(pair_index);
+    modular_adns5050_init_slot(first);
+    modular_adns5050_init_slot(second);
+
+    for (uint8_t slot = first; slot <= second; slot++) {
+        if (modular_adns5050_probe(slot)) {
+            trackball_sensor_type[slot] = TRACKBALL_SENSOR_ADNS5050;
+            trackball_connected[slot]   = true;
+        }
     }
 }
 
@@ -182,8 +219,8 @@ trackball_sensor_type_t trackball_get_sensor_type(uint8_t index) {
 }
 
 bool pointing_device_driver_init(void) {
-    for (uint8_t i = 0; i < TRACKBALL_SLOT_COUNT; i++) {
-        trackball_probe_slot(i);
+    for (uint8_t pair = 0; pair < TRACKBALL_SHARED_PAIR_COUNT; pair++) {
+        trackball_probe_pair(pair);
     }
     set_auto_mouse_layer(AUTO_MOUSE_DEFAULT_LAYER); // default
     set_auto_mouse_enable(true);
