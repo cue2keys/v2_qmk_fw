@@ -72,6 +72,7 @@ typedef struct {
 // High-level API (multi-sensor aggregation)
 bool           modular_pmw3610_init(void);
 void           modular_pmw3610_init_slot(uint8_t index);
+void           modular_pmw3610_set_motion_mode_for_pair(uint8_t pair_index);
 bool           modular_pmw3610_probe(uint8_t index);
 report_mouse_t modular_pmw3610_get_all_report(report_mouse_t mouse_report);
 uint16_t       modular_pmw3610_get_all_cpi(void);

@@ -58,6 +58,10 @@ const pin_t PMW3610_SDIO_PINS[]   = MODULAR_PMW3610_SDIO_PINS;
 const pin_t PMW3610_CS_PINS[]     = MODULAR_PMW3610_CS_PINS;
 const pin_t PMW3610_MOTION_PINS[] = MODULAR_PMW3610_MOTION_PINS;
 
+static inline uint8_t pair_start_slot(uint8_t pair_index) {
+    return (uint8_t)(pair_index * 2u);
+}
+
 // angle per sensor
 static uint16_t angle_deg[NUM_MODULAR_PMW3610] = {0};
 static uint32_t trackball_timeout_length       = 5 * 60 * 1000; // default: 5 min
@@ -82,7 +86,6 @@ void modular_pmw3610_init_slot(uint8_t index) {
     gpio_set_pin_output(PMW3610_SCLK_PINS[index]);
     gpio_set_pin_output(PMW3610_SDIO_PINS[index]);
     gpio_set_pin_output(PMW3610_CS_PINS[index]);
-    gpio_set_pin_input_high(PMW3610_MOTION_PINS[index]);
 
     gpio_write_pin_high(PMW3610_CS_PINS[index]);
     gpio_write_pin_high(PMW3610_SCLK_PINS[index]); // idle high (SPI mode 3)
@@ -93,9 +96,21 @@ void modular_pmw3610_init_slot(uint8_t index) {
     angle_deg[index]    = 0;
 }
 
+void modular_pmw3610_set_motion_mode_for_pair(uint8_t pair_index) {
+    uint8_t first = pair_start_slot(pair_index);
+    if ((first + 1u) >= NUM_MODULAR_PMW3610) {
+        return;
+    }
+
+    gpio_set_pin_input_high(PMW3610_MOTION_PINS[first]);
+}
+
 bool modular_pmw3610_init(void) {
     for (uint8_t i = 0; i < NUM_MODULAR_PMW3610; i++) {
         modular_pmw3610_init_slot(i);
+    }
+    for (uint8_t pair = 0; (pair * 2u) < NUM_MODULAR_PMW3610; pair++) {
+        modular_pmw3610_set_motion_mode_for_pair(pair);
     }
 
     modular_pmw3610_wake_up_all(false);
@@ -312,8 +327,6 @@ void modular_pmw3610_wake_up(uint8_t index, bool connected_only) {
     wait_ms(50);
 
     uint8_t pid = modular_pmw3610_read_reg(index, REG_PROD_ID);
-    // uint8_t rid = modular_pmw3610_read_reg(index, REG_REV_ID);
-    // dprintf("pmw3610 %d: pid=0x%02X rid=0x%02X\n", index, pid, rid);
     if (pid != 0x3E) { // Expected product ID
         powered_down[index] = true;
         connected[index]    = false;
@@ -414,8 +427,8 @@ report_mouse_t modular_pmw3610_get_report(uint8_t index, report_mouse_t mouse_re
     if (!connected[index]) return mouse_report;
     if (powered_down[index]) return mouse_report;
 
-    // no motion
-    if (!modular_pmw3610_check_motion(index)) {
+    bool motion_gpio_active = modular_pmw3610_check_motion(index);
+    if (!motion_gpio_active) {
         return mouse_report;
     }
 

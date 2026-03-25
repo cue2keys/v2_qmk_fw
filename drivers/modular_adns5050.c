@@ -66,6 +66,10 @@ const pin_t SDIO_PINS[]  = MODULAR_ADNS5050_SDIO_PINS;
 const pin_t CS_PINS[]    = MODULAR_ADNS5050_CS_PINS;
 const pin_t RESET_PINS[] = MODULAR_ADNS5050_RESET_PINS;
 
+static inline uint8_t pair_start_slot(uint8_t pair_index) {
+    return (uint8_t)(pair_index * 2u);
+}
+
 // angle for each sensor.
 uint16_t angle[NUM_MODULAR_ADNS5050] = {0};
 uint32_t trackball_timeout_length    = 5 * 60 * 1000; // default: 5 min
@@ -79,11 +83,9 @@ void modular_adns5050_init_slot(uint8_t index) {
     gpio_set_pin_output(SCLK_PINS[index]);
     gpio_set_pin_output(SDIO_PINS[index]);
     gpio_set_pin_output(CS_PINS[index]);
-    gpio_set_pin_output(RESET_PINS[index]);
 
     gpio_write_pin_high(SCLK_PINS[index]);
     gpio_write_pin_high(CS_PINS[index]);
-    gpio_write_pin_high(RESET_PINS[index]);
 
     powered_down[index] = true;
     connected[index]    = false;
@@ -91,9 +93,22 @@ void modular_adns5050_init_slot(uint8_t index) {
     cpi_setting[index]  = ADNS5050_DEFAULT_CPI;
 }
 
+void modular_adns5050_set_reset_mode_for_pair(uint8_t pair_index) {
+    uint8_t first = pair_start_slot(pair_index);
+    if ((first + 1u) >= NUM_MODULAR_ADNS5050) {
+        return;
+    }
+
+    gpio_set_pin_output(RESET_PINS[first]);
+    gpio_write_pin_high(RESET_PINS[first]);
+}
+
 bool modular_adns5050_init(void) {
     for (uint8_t i = 0; i < NUM_MODULAR_ADNS5050; i++) {
         modular_adns5050_init_slot(i);
+    }
+    for (uint8_t pair = 0; (pair * 2u) < NUM_MODULAR_ADNS5050; pair++) {
+        modular_adns5050_set_reset_mode_for_pair(pair);
     }
 
     modular_adns5050_wake_up_all(false);

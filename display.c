@@ -530,7 +530,6 @@ __attribute__((weak)) bool oled_send_cmd_P(const uint8_t *data, uint16_t size) {
     spi_stop();
     return (status >= 0);
 #        elif defined(OLED_TRANSPORT_I2C)
-
     change_channel(OLED_CHANNEL);
     i2c_status_t status = i2c_transmit_P((OLED_DISPLAY_ADDRESS << 1), data, size, OLED_I2C_TIMEOUT);
 
